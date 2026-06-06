@@ -935,14 +935,17 @@ window.__dataReady.then(data => {
     // ปีที่มีข้อมูล
     const years = [...new Set(rawItems.map(r=>r.year))].sort((a,b)=>a-b);
 
-    // กรองตาม year + code
+    // กรองตาม year + code (ไม่รวม รับคืนสินค้าใช้ได้)
+    const notReturnOk = r => !/รับคืนสินค้าใช้ได้/i.test(r.cause||'');
     const items = rawItems.filter(r =>
+      notReturnOk(r) &&
       (filterYear==='ALL' || r.year===Number(filterYear)) &&
       (filterCode==='ALL' || r.code_type===filterCode)
     );
 
     // รวมยอดรายเดือน (ใช้ทุก code สำหรับ sales %)
     const allFiltered = rawItems.filter(r =>
+      notReturnOk(r) &&
       (filterYear==='ALL' || r.year===Number(filterYear))
     );
 
