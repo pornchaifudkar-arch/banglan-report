@@ -1159,8 +1159,15 @@ window.__dataReady.then(data => {
             sub={`ยอดขาย: ${dmgSales?bahtFmt(dmgSales)+' ฿':'ไม่มีข้อมูล'}`} accent={PALETTE.cancel}/>
           <KpiCard label={`% เสียหาย ${dmgLabel}`} value={dmgPct!=null?dmgPct.toFixed(3):'–'} unit="%"
             sub="มูลค่าเสียหาย ÷ ยอดขาย" accent={dmgPct!=null&&dmgPct<=0.7?'#5a8f3c':PALETTE.cancel}/>
-          <KpiCard label={`มูลค่าเสียหาย ${prevLabel}`} value={prevTotal?bahtFmt(prevTotal):'–'} unit=" ฿"
-            sub={`ยอดขาย: ${prevSales?bahtFmt(prevSales)+' ฿':'ไม่มีข้อมูล'}`} accent='#e67e22'/>
+          {(()=>{
+            const diff = prevTotal ? dmgTotal - prevTotal : null;
+            const diffSign = diff!=null ? (diff>=0?'+':'') : '';
+            return <KpiCard label={`เทียบ ${prevLabel} (±฿)`}
+              value={diff!=null ? diffSign+bahtFmt(Math.abs(diff)) : '–'} unit=" ฿"
+              sub={diff!=null ? `${prevLabel}: ${bahtFmt(prevTotal)} ฿` : 'ไม่มีข้อมูลเดือนก่อน'}
+              accent={diff==null?'var(--muted-text)':diff<=0?'#5a8f3c':'#c0392b'}
+              delta={diff!=null?{dir:diff<=0?-1:1,text:''}:null}/>;
+          })()}
           <KpiCard label={`เทียบ ${prevLabel} (±%)`}
             value={pctDiff!=null?(pctDiff>=0?'+':'')+pctDiff.toFixed(3):'–'} unit="%"
             sub={prevPct!=null?`% เสียหาย ${prevLabel}: ${prevPct.toFixed(3)}%`:'ไม่มีข้อมูลเดือนก่อน'}
