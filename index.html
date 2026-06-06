@@ -991,42 +991,63 @@ window.__dataReady.then(data => {
               </div>
 
               <div style={{display:'flex',flexDirection:'column',gap:'12px',maxHeight:480,overflowY:'auto'}}>
-                {Object.entries(grouped).map(([grp,rows],gi)=>{
-                  const grpTotal = rows.reduce((a,r)=>a+(r.amount||0),0);
-                  return (
-                    <div key={gi}>
-                      {/* หัวหน่วยงาน */}
-                      <div style={{background:'#e8edf8',borderRadius:8,padding:'6px 10px',marginBottom:6,
-                        display:'flex',justifyContent:'space-between',alignItems:'center'}}>
-                        <span style={{fontSize:'12px',fontWeight:700,color:'#2f5fd0'}}>📁 {grp}</span>
-                        <span style={{fontFamily:'var(--num)',fontSize:'12px',fontWeight:700,color:'#c0392b'}}>
-                          {Number(grpTotal).toLocaleString('th-TH',{minimumFractionDigits:2,maximumFractionDigits:2})} ฿
+                {(()=>{
+                  const rebRob = custDetail.filter(r=>r.code_type==='REB'||r.code_type==='ROB');
+                  const idItems = custDetail.filter(r=>r.code_type==='ID');
+
+                  // จัดกลุ่ม REB/ROB ตามหน่วยงาน
+                  const rebRobGroups = rebRob.reduce((acc,r)=>{
+                    const g=r.damage_group||'ไม่ระบุหน่วยงาน';
+                    if(!acc[g]) acc[g]=[];
+                    acc[g].push(r); return acc;
+                  },{});
+
+                  const itemCard = (r,ri) => (
+                    <div key={ri} style={{background:'#fff',borderRadius:8,border:'1px solid #e0e7ff',
+                      padding:'8px 12px',marginBottom:4}}>
+                      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:3}}>
+                        <span style={{padding:'2px 7px',borderRadius:8,fontSize:'11px',fontWeight:700,
+                          background:(CODE_COLOR[r.code_type]||'#888')+'22',color:CODE_COLOR[r.code_type]||'#888'}}>
+                          {r.code_type}
+                        </span>
+                        <span style={{fontFamily:'var(--num)',fontWeight:700,color:'#c0392b',fontSize:'14px'}}>
+                          {Number(r.amount||0).toLocaleString('th-TH',{minimumFractionDigits:2,maximumFractionDigits:2})} ฿
                         </span>
                       </div>
-                      {/* รายการในหน่วยงาน */}
-                      {rows.map((r,ri)=>(
-                        <div key={ri} style={{background:'#fff',borderRadius:8,border:'1px solid #e0e7ff',
-                          padding:'8px 12px',marginBottom:4}}>
-                          <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:3}}>
-                            <span style={{padding:'2px 7px',borderRadius:8,fontSize:'11px',fontWeight:700,
-                              background:(CODE_COLOR[r.code_type]||'#888')+'22',color:CODE_COLOR[r.code_type]||'#888'}}>
-                              {r.code_type}
-                            </span>
-                            <span style={{fontFamily:'var(--num)',fontWeight:700,color:'#c0392b',fontSize:'14px'}}>
-                              {Number(r.amount||0).toLocaleString('th-TH',{minimumFractionDigits:2,maximumFractionDigits:2})} ฿
-                            </span>
-                          </div>
-                          <div style={{fontSize:'13px',fontWeight:600,color:'var(--ink)',marginBottom:2}}>
-                            {r.cause||'ไม่ระบุสาเหตุ'}
-                          </div>
-                          <div style={{fontSize:'11px',color:'var(--muted-text)'}}>
-                            {MONTHS_TH_SHORT[(r.month||1)-1]}-{String(r.year).slice(-2)}
-                          </div>
-                        </div>
-                      ))}
+                      <div style={{fontSize:'13px',fontWeight:600,color:'var(--ink)',marginBottom:2}}>{r.cause||'ไม่ระบุสาเหตุ'}</div>
+                      <div style={{fontSize:'11px',color:'var(--muted-text)'}}>{MONTHS_TH_SHORT[(r.month||1)-1]}-{String(r.year).slice(-2)}</div>
                     </div>
                   );
-                })}
+
+                  return <>
+                    {/* REB/ROB — แยกตามหน่วยงาน */}
+                    {Object.keys(rebRobGroups).length>0 && Object.entries(rebRobGroups).map(([grp,rows],gi)=>{
+                      const grpTotal=rows.reduce((a,r)=>a+(r.amount||0),0);
+                      return <div key={gi}>
+                        <div style={{background:'#dbeafe',borderRadius:8,padding:'6px 10px',marginBottom:6,
+                          display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+                          <span style={{fontSize:'12px',fontWeight:700,color:'#1d4ed8'}}>📁 {grp}</span>
+                          <span style={{fontFamily:'var(--num)',fontSize:'12px',fontWeight:700,color:'#c0392b'}}>
+                            {Number(grpTotal).toLocaleString('th-TH',{minimumFractionDigits:2,maximumFractionDigits:2})} ฿
+                          </span>
+                        </div>
+                        {rows.map((r,ri)=>itemCard(r,ri))}
+                      </div>;
+                    })}
+
+                    {/* ID — ไม่มีหน่วยงาน */}
+                    {idItems.length>0 && <div>
+                      <div style={{background:'#fce7f3',borderRadius:8,padding:'6px 10px',marginBottom:6,
+                        display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+                        <span style={{fontSize:'12px',fontWeight:700,color:'#9d174d'}}>🏭 เสียหายในโรงงาน (ID)</span>
+                        <span style={{fontFamily:'var(--num)',fontSize:'12px',fontWeight:700,color:'#c0392b'}}>
+                          {Number(idItems.reduce((a,r)=>a+(r.amount||0),0)).toLocaleString('th-TH',{minimumFractionDigits:2,maximumFractionDigits:2})} ฿
+                        </span>
+                      </div>
+                      {idItems.map((r,ri)=>itemCard(r,ri))}
+                    </div>}
+                  </>;
+                })()}
               </div>
             </div>
           )}
