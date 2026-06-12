@@ -1767,10 +1767,156 @@ window.__dataReady.then(data => {
     </div>;
   }
 
+  // ============================================================
+  // Concrete Strength View
+  // ============================================================
+  const CONCRETE_URL='https://script.google.com/macros/s/AKfycbyAxQQr5tU_Ha21ny5wzfbMt5_dNMn7SFBikWuJBwMfuSRz3qtyLQKMNeBUVTHfY6xj/exec';
+
+  function MultiSelect({label,options,value,onChange}){
+    const [open,setOpen]=useState(false);
+    const ref=useRef(null);
+    useEffect(()=>{
+      const h=e=>{if(ref.current&&!ref.current.contains(e.target))setOpen(false);};
+      document.addEventListener('mousedown',h);return()=>document.removeEventListener('mousedown',h);
+    },[]);
+    const toggle=v=>onChange(value.includes(v)?value.filter(x=>x!==v):[...value,v]);
+    const txt=value.length===0?`ทั้งหมด`:value.length===1?value[0]:`${value.length} รายการ`;
+    return <div ref={ref} style={{position:'relative',display:'inline-block',minWidth:140}}>
+      <button onClick={()=>setOpen(!open)} style={{padding:'5px 10px',border:'1px solid #ccd',borderRadius:6,background:'#fff',cursor:'pointer',width:'100%',textAlign:'left',fontSize:13}}>
+        <span style={{fontWeight:500,color:'#555',marginRight:4}}>{label}:</span>{txt} ▾
+      </button>
+      {open&&<div style={{position:'absolute',top:'110%',left:0,zIndex:99,background:'#fff',border:'1px solid #ccd',borderRadius:8,boxShadow:'0 4px 16px rgba(0,0,0,.12)',minWidth:160,padding:'6px 0'}}>
+        <div onClick={()=>onChange([])} style={{padding:'6px 14px',cursor:'pointer',fontSize:13,color:value.length===0?'#2f5fd0':'#333',fontWeight:value.length===0?700:400}}>ทั้งหมด</div>
+        {options.map(o=><div key={o} onClick={()=>toggle(o)} style={{padding:'6px 14px',cursor:'pointer',fontSize:13,display:'flex',alignItems:'center',gap:8,background:value.includes(o)?'#f0f4ff':'',color:value.includes(o)?'#2f5fd0':'#333'}}>
+          <span style={{width:14,height:14,border:'1.5px solid #aab',borderRadius:3,display:'inline-flex',alignItems:'center',justifyContent:'center',background:value.includes(o)?'#2f5fd0':'#fff',color:'#fff',fontSize:11,flexShrink:0}}>{value.includes(o)?'✓':''}</span>
+          {o}
+        </div>)}
+      </div>}
+    </div>;
+  }
+
+  function ConcreteView(){
+    const [rows,setRows]=useState([]);
+    const [loading,setLoading]=useState(true);
+    const [err,setErr]=useState(null);
+    const [dateFrom,setDateFrom]=useState('');
+    const [dateTo,setDateTo]=useState('');
+    const [selFormulas,setSelFormulas]=useState([]);
+    const [selAges,setSelAges]=useState([]);
+    const [selSample,setSelSample]=useState(null);
+    const [selFormula2,setSelFormula2]=useState(null);
+
+    useEffect(()=>{
+      fetch(CONCRETE_URL).then(r=>r.json()).then(res=>{
+        if(res.success) setRows(res.data||[]);
+        else setErr('โหลดข้อมูลไม่สำเร็จ');
+        setLoading(false);
+      }).catch(e=>{setErr('เชื่อมต่อไม่ได้: '+e.message);setLoading(false);});
+    },[]);
+
+    if(loading) return <div style={{padding:40,textAlign:'center',color:'#888'}}>กำลังโหลด...</div>;
+    if(err) return <div style={{padding:40,textAlign:'center',color:'#c00'}}>{err}</div>;
+    if(!rows.length) return <div style={{padding:40,textAlign:'center',color:'#888'}}>ยังไม่มีข้อมูล — ใช้ /คอนกรีต ใน Code tab เพื่อบันทึกผลทดสอบ</div>;
+
+    const getVal=(r,k)=>r[k]||r[Object.keys(r).find(x=>x.trim()===k.trim())||''];
+    const sampleDate=r=>String(getVal(r,'วันที่เก็บตัวอย่าง')||'').slice(0,10);
+    const testDate=r=>String(getVal(r,'วันที่ทดสอบ')||'').slice(0,10);
+    const formula=r=>String(getVal(r,'ชื่อสูตร')||'').trim();
+    const age=r=>Number(getVal(r,'อายุ(วัน)')||0);
+    const ksc=r=>Number(getVal(r,'เฉลี่ย KSC')||0);
+
+    const allFormulas=[...new Set(rows.map(formula).filter(Boolean))].sort();
+    const allAges=[...new Set(rows.map(age).filter(Boolean))].sort((a,b)=>a-b);
+
+    // filter for chart 1
+    const filt=rows.filter(r=>{
+      const sd=sampleDate(r);
+      if(dateFrom&&sd<dateFrom) return false;
+      if(dateTo&&sd>dateTo) return false;
+      if(selFormulas.length&&!selFormulas.includes(formula(r))) return false;
+      if(selAges.length&&!selAges.includes(age(r))) return false;
+      return true;
+    });
+
+    const c1Dates=[...new Set(filt.map(sampleDate))].sort();
+    const c1Formulas=selFormulas.length?selFormulas:allFormulas;
+    const COLORS=['#2f5fd0','#d65b5b','#d98a2b','#15a39b','#7b61c4','#5a8f3c','#c44d8f','#4a6b8a'];
+    const c1Series=c1Formulas.map((f,fi)=>({
+      label:f, color:COLORS[fi%COLORS.length],
+      data:c1Dates.map(d=>{
+        const rs=filt.filter(r=>sampleDate(r)===d&&formula(r)===f);
+        if(!rs.length) return null;
+        const sum=rs.reduce((s,r)=>s+ksc(r),0);
+        return Math.round((sum/rs.length)*10)/10;
+      })
+    }));
+
+    // chart 2: age curve
+    const sampleDates=[...new Set(rows.map(sampleDate))].sort();
+    const c2Ages=allAges;
+    const c2Formulas=selFormula2?[selFormula2]:allFormulas;
+    const c2Series=selSample?c2Formulas.map((f,fi)=>({
+      label:f, color:COLORS[fi%COLORS.length],
+      data:c2Ages.map(a=>{
+        const rs=rows.filter(r=>sampleDate(r)===selSample&&formula(r)===f&&age(r)===a);
+        if(!rs.length) return null;
+        return Math.round((rs.reduce((s,r)=>s+ksc(r),0)/rs.length)*10)/10;
+      })
+    })):[];
+
+    return <div style={{padding:'24px 20px'}}>
+      {/* Chart 1 */}
+      <div className="chart-card" style={{marginBottom:24}}>
+        <div style={{display:'flex',alignItems:'center',flexWrap:'wrap',gap:10,marginBottom:16}}>
+          <span style={{fontWeight:700,fontSize:15,color:'#1a2540',marginRight:4}}>กำลังอัดคอนกรีตตามวันเก็บตัวอย่าง</span>
+          <label style={{fontSize:13,color:'#555'}}>จาก <input type="date" value={dateFrom} onChange={e=>setDateFrom(e.target.value)} style={{border:'1px solid #ccd',borderRadius:5,padding:'3px 6px',fontSize:13}}/></label>
+          <label style={{fontSize:13,color:'#555'}}>ถึง <input type="date" value={dateTo} onChange={e=>setDateTo(e.target.value)} style={{border:'1px solid #ccd',borderRadius:5,padding:'3px 6px',fontSize:13}}/></label>
+          <MultiSelect label="สูตร" options={allFormulas} value={selFormulas} onChange={setSelFormulas}/>
+          <MultiSelect label="อายุ(วัน)" options={allAges.map(String)} value={selAges.map(String)} onChange={v=>setSelAges(v.map(Number))}/>
+          {(dateFrom||dateTo||selFormulas.length||selAges.length)&&<button onClick={()=>{setDateFrom('');setDateTo('');setSelFormulas([]);setSelAges([]);}} style={{fontSize:12,padding:'4px 10px',borderRadius:5,border:'1px solid #ccd',background:'#f5f6fa',cursor:'pointer',color:'#555'}}>ล้าง</button>}
+        </div>
+        {c1Dates.length===0
+          ?<div style={{textAlign:'center',color:'#aaa',padding:40}}>ไม่มีข้อมูลตามเงื่อนไขที่เลือก</div>
+          :<>
+            <div style={{display:'flex',gap:12,flexWrap:'wrap',marginBottom:8}}>
+              {c1Series.map(s=><span key={s.label} style={{fontSize:12,display:'flex',alignItems:'center',gap:4}}><span style={{width:16,height:3,background:s.color,display:'inline-block',borderRadius:2}}></span>{s.label}</span>)}
+            </div>
+            <LineChart categories={c1Dates} unit="KSC" decimals={1} showValues series={c1Series} height={280}/>
+          </>
+        }
+      </div>
+
+      {/* Chart 2 */}
+      <div className="chart-card">
+        <div style={{display:'flex',alignItems:'center',flexWrap:'wrap',gap:10,marginBottom:16}}>
+          <span style={{fontWeight:700,fontSize:15,color:'#1a2540',marginRight:4}}>กราฟอายุคอนกรีต (Strength Curve)</span>
+          <label style={{fontSize:13,color:'#555'}}>วันที่เก็บ:&nbsp;
+            <select value={selSample||''} onChange={e=>setSelSample(e.target.value||null)} style={{border:'1px solid #ccd',borderRadius:5,padding:'3px 8px',fontSize:13}}>
+              <option value="">-- เลือกวันที่ --</option>
+              {sampleDates.map(d=><option key={d} value={d}>{d}</option>)}
+            </select>
+          </label>
+          <MultiSelect label="สูตร" options={allFormulas} value={selFormula2?[selFormula2]:[]} onChange={v=>setSelFormula2(v[v.length-1]||null)}/>
+        </div>
+        {!selSample
+          ?<div style={{textAlign:'center',color:'#aaa',padding:40}}>เลือกวันที่เก็บตัวอย่างเพื่อดูกราฟ Strength Curve</div>
+          :c2Ages.length===0
+            ?<div style={{textAlign:'center',color:'#aaa',padding:40}}>ไม่มีข้อมูลสำหรับวันที่นี้</div>
+            :<>
+              <div style={{display:'flex',gap:12,flexWrap:'wrap',marginBottom:8}}>
+                {c2Series.map(s=><span key={s.label} style={{fontSize:12,display:'flex',alignItems:'center',gap:4}}><span style={{width:16,height:3,background:s.color,display:'inline-block',borderRadius:2}}></span>{s.label}</span>)}
+              </div>
+              <LineChart categories={c2Ages.map(a=>`Day ${a}`)} unit="KSC" decimals={1} showValues series={c2Series} height={280}/>
+            </>
+        }
+      </div>
+    </div>;
+  }
+
   function App(){
     const [tab,setTab]=useState('overview');
     const [year,setYear]=useState(()=>Math.max(...Object.keys(D.years).map(Number)));
-    const tabs=[{id:'overview',label:'ภาพรวมการผลิต'},{id:'compare',label:'เทียบรายปี'},{id:'quality',label:'คุณภาพ & วัตถุดิบ'},{id:'damage',label:'มูลค่า-เปอร์เซ็นต์เสียหาย'}];
+    const tabs=[{id:'overview',label:'ภาพรวมการผลิต'},{id:'compare',label:'เทียบรายปี'},{id:'quality',label:'คุณภาพ & วัตถุดิบ'},{id:'damage',label:'มูลค่า-เปอร์เซ็นต์เสียหาย'},{id:'concrete',label:'Concrete Strength'}];
     return <div className="app">
       <header className="topbar">
         <div className="topbar__brand">
@@ -1781,7 +1927,7 @@ window.__dataReady.then(data => {
           </div>
         </div>
         <div className="topbar__actions">
-          {tab!=='compare'&&tab!=='damage'&&<div className="yearpick">
+          {tab!=='compare'&&tab!=='damage'&&tab!=='concrete'&&<div className="yearpick">
             <span className="yearpick__lbl">ปี</span>
             <Segmented value={year} onChange={setYear} options={Object.keys(D.years).map(Number).sort((a,b)=>a-b).map(y=>({value:y,label:String(y)}))}/>
             {!yearData(year).real&&<span className="badge-sample">ข้อมูลตัวอย่าง</span>}
@@ -1794,7 +1940,7 @@ window.__dataReady.then(data => {
         {tab==='compare'&&<YearCompareTab/>}
         {tab==='quality'&&<QualityTab year={year}/>}
         {tab==='damage'&&<DamageDetailTab/>}
-
+        {tab==='concrete'&&<ConcreteView/>}
       </main>
       <footer className="foot">หน่วยปริมาณ = m³ ของคอนกรีต • Strength = ksc • วัตถุดิบ = kg/m³ &nbsp;·&nbsp; ข้อมูลการผลิต 2569 (ม.ค.–เม.ย.)</footer>
     </div>;
