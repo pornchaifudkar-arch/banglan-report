@@ -523,9 +523,9 @@ function BarChart({categories,values,color=PALETTE.produced,target=null,targetLa
   </div>;
 }
 
-function LineChart({categories,series,targets=[],height=300,unit='',decimals=0,yMin=null,yMax=null,area=false,showValues=false,dangerBelow=null}){
+function LineChart({categories,series,targets=[],height=300,unit='',decimals=0,yMin=null,yMax=null,area=false,showValues=false,dangerBelow=null,boxedLabels=false}){
   const [ref,W]=useMeasure(); const [hover,setHover]=useState(null);
-  const pad={t:20,r:16,b:40,l:52},H=height,iW=Math.max(10,W-pad.l-pad.r),iH=H-pad.t-pad.b;
+  const pad={t:boxedLabels?28:20,r:16,b:40,l:52},H=height,iW=Math.max(10,W-pad.l-pad.r),iH=H-pad.t-pad.b;
   const allV=series.flatMap(s=>s.data.filter(v=>v!=null)).concat(targets.map(t=>t.value));
   let lo=yMin!=null?yMin:Math.min(...allV),hi=yMax!=null?yMax:Math.max(...allV);
   if(yMin==null)lo=Math.floor(lo*0.96); if(yMax==null)hi=Math.ceil(hi*1.04);
@@ -534,6 +534,40 @@ function LineChart({categories,series,targets=[],height=300,unit='',decimals=0,y
   const x=i=>pad.l+(categories.length===1?iW/2:(i/(categories.length-1))*iW);
   const y=v=>pad.t+iH-((v-lo)/(hi-lo))*iH;
   const lp=data=>data.map((v,i)=>v==null?null:`${i===0||data[i-1]==null?'M':'L'}${x(i)},${y(v)}`).filter(Boolean).join(' ');
+
+  // boxed labels with anti-collision
+  let boxEls=null;
+  if(showValues&&boxedLabels&&W>0){
+    const lbls=[];
+    series.forEach((s)=>{s.data.forEach((v,i)=>{if(v==null)return;lbls.push({xi:i,cx:x(i),cy:y(v)-16,color:s.color,text:fmt(v,decimals)});});});
+    const byXi={};
+    lbls.forEach((l,idx)=>{if(!byXi[l.xi])byXi[l.xi]=[];byXi[l.xi].push({...l,idx});});
+    const GAP=21;
+    Object.values(byXi).forEach(grp=>{
+      if(grp.length<=1)return;
+      grp.sort((a,b)=>a.cy-b.cy);
+      for(let iter=0;iter<40;iter++){
+        let ok=true;
+        for(let i=1;i<grp.length;i++){
+          if(grp[i].cy-grp[i-1].cy<GAP){
+            const mid=(grp[i].cy+grp[i-1].cy)/2;
+            grp[i-1].cy=mid-GAP/2; grp[i].cy=mid+GAP/2; ok=false;
+          }
+        }
+        if(ok)break;
+      }
+      grp.forEach(l=>{lbls[l.idx]={...lbls[l.idx],cy:Math.max(pad.t+6,l.cy)};});
+    });
+    boxEls=lbls.map((l,idx)=>{
+      const tw=l.text.length*6.8+10;
+      return <g key={'bl'+idx}>
+        <rect x={l.cx-tw/2} y={l.cy-14} width={tw} height={17} rx="3" fill="white" stroke={l.color} strokeWidth="1.8"/>
+        <text x={l.cx} y={l.cy} textAnchor="middle" fill="#111" style={{fontSize:'10px',fontWeight:700,fontFamily:'var(--num)'}}>{l.text}</text>
+        <line x1={l.cx} y1={l.cy+4} x2={l.cx} y2={y(l.xi<series[0].data.length?lbls[idx].cy+14:0)} stroke={l.color} strokeWidth="0.8" opacity="0.4"/>
+      </g>;
+    });
+  }
+
   return <div className="chart" ref={ref} style={{position:'relative'}} onMouseLeave={()=>setHover(null)}
     onMouseMove={e=>{const r=ref.current.getBoundingClientRect();let idx=Math.round(((e.clientX-r.left-pad.l)/iW)*(categories.length-1));setHover(Math.max(0,Math.min(categories.length-1,idx)));}}>
     <svg width={W} height={H}>
@@ -542,9 +576,10 @@ function LineChart({categories,series,targets=[],height=300,unit='',decimals=0,y
       {area&&series.length===1&&<path d={`${lp(series[0].data)} L${x(categories.length-1)},${pad.t+iH} L${x(0)},${pad.t+iH} Z`} fill={series[0].color} opacity="0.10"/>}
       {series.map((s,si)=><g key={si}>
         <path d={lp(s.data)} fill="none" stroke={s.color} strokeWidth="2.4" strokeLinejoin="round" strokeLinecap="round"/>
-        {showValues&&s.data.map((v,i)=>v==null?null:<text key={'vl'+i} x={x(i)} y={y(v)-11} textAnchor="middle" className="bar-val" fill={dangerBelow!=null&&v<dangerBelow?PALETTE.cancel:s.color}>{fmt(v,decimals)}</text>)}
+        {showValues&&!boxedLabels&&s.data.map((v,i)=>v==null?null:<text key={'vl'+i} x={x(i)} y={y(v)-11} textAnchor="middle" className="bar-val" fill={dangerBelow!=null&&v<dangerBelow?PALETTE.cancel:s.color}>{fmt(v,decimals)}</text>)}
         {s.data.map((v,i)=>v==null?null:<circle key={i} cx={x(i)} cy={y(v)} r={hover===i?5:(dangerBelow!=null&&v<dangerBelow?4:3)} fill="#fff" stroke={dangerBelow!=null&&v<dangerBelow?PALETTE.cancel:s.color} strokeWidth="2"/>)}
       </g>)}
+      {boxEls}
       {hover!=null&&<line x1={x(hover)} x2={x(hover)} y1={pad.t} y2={pad.t+iH} stroke={PALETTE.axis} strokeDasharray="3 3" opacity="0.5"/>}
       {categories.map((cat,ci)=><text key={ci} x={x(ci)} y={H-pad.b+18} textAnchor="middle" className="ax-lbl">{cat}</text>)}
     </svg>
@@ -1813,11 +1848,11 @@ window.__dataReady.then(data => {
         if(res.success){
           const data=res.data||[];
           setRows(data);
-          // default: 15 วันล่าสุด
+          // default: 10 วันล่าสุด
           const dates=data.map(r=>String(r['วันที่เก็บตัวอย่าง']||'').slice(0,10)).filter(Boolean).sort();
           if(dates.length){
             const last=dates[dates.length-1];
-            const d=new Date(last); d.setDate(d.getDate()-14);
+            const d=new Date(last); d.setDate(d.getDate()-9);
             setDateTo(last);
             setDateFrom(d.toISOString().slice(0,10));
           }
@@ -1896,10 +1931,10 @@ window.__dataReady.then(data => {
       <div className="chart-card" style={{marginBottom:24}}>
         <div style={{display:'flex',alignItems:'center',flexWrap:'wrap',gap:10,marginBottom:16}}>
           <span style={{fontWeight:700,fontSize:15,color:'#1a2540'}}>กำลังอัดคอนกรีตตามวันเก็บตัวอย่าง</span>
-          <button style={btnStyle} onClick={()=>shiftDays(-15)}>◀ 15 วัน</button>
+          <button style={btnStyle} onClick={()=>shiftDays(-10)}>◀ 10 วัน</button>
           <label style={{fontSize:13,color:'#555'}}>จาก <input type="date" value={dateFrom} onChange={e=>setDateFrom(e.target.value)} style={{border:'1px solid #ccd',borderRadius:5,padding:'3px 6px',fontSize:13}}/></label>
           <label style={{fontSize:13,color:'#555'}}>ถึง <input type="date" value={dateTo} onChange={e=>setDateTo(e.target.value)} style={{border:'1px solid #ccd',borderRadius:5,padding:'3px 6px',fontSize:13}}/></label>
-          <button style={btnStyle} onClick={()=>shiftDays(15)}>15 วัน ▶</button>
+          <button style={btnStyle} onClick={()=>shiftDays(10)}>10 วัน ▶</button>
           <MultiSelect label="สูตร" options={allFormulas} value={selFormulas} onChange={setSelFormulas}/>
           <MultiSelect label="อายุ(วัน)" options={allAges.map(String)} value={selAges.map(String)} onChange={v=>setSelAges(v.map(Number))}/>
           {(selFormulas.length||selAges.length)&&<button onClick={()=>{setSelFormulas([]);setSelAges([7]);}} style={{...btnStyle,color:'#c00'}}>ล้าง</button>}
@@ -1908,11 +1943,11 @@ window.__dataReady.then(data => {
           ?<div style={{textAlign:'center',color:'#aaa',padding:40}}>ไม่มีข้อมูลในช่วงที่เลือก</div>
           :<>
             <div style={{display:'flex',gap:16,flexWrap:'wrap',marginBottom:8}}>
-              {c1Series.filter(s=>s.data.some(v=>v!=null)).map(s=><span key={s.label} style={{fontSize:12,display:'flex',alignItems:'center',gap:5,color:s.color,fontWeight:600}}>
+              {c1Series.filter(s=>s.data.some(v=>v!=null)).map(s=><span key={s.label} style={{fontSize:12,display:'flex',alignItems:'center',gap:5,color:'#111',fontWeight:600}}>
                 <span style={{width:18,height:3,background:s.color,display:'inline-block',borderRadius:2}}></span>{s.label}
               </span>)}
             </div>
-            <LineChart categories={c1Dates} unit="KSC" decimals={1} showValues series={c1Series.filter(s=>s.data.some(v=>v!=null))} height={300}/>
+            <LineChart categories={c1Dates} unit="KSC" decimals={1} showValues boxedLabels series={c1Series.filter(s=>s.data.some(v=>v!=null))} height={320}/>
           </>
         }
       </div>
@@ -1933,11 +1968,11 @@ window.__dataReady.then(data => {
           ?<div style={{textAlign:'center',color:'#aaa',padding:40}}>เลือกวันที่เก็บตัวอย่างเพื่อดูกราฟ Strength Curve</div>
           :<>
             <div style={{display:'flex',gap:16,flexWrap:'wrap',marginBottom:8}}>
-              {c2Series.filter(s=>s.data.some(v=>v!=null)).map(s=><span key={s.label} style={{fontSize:12,display:'flex',alignItems:'center',gap:5,color:s.color,fontWeight:600}}>
+              {c2Series.filter(s=>s.data.some(v=>v!=null)).map(s=><span key={s.label} style={{fontSize:12,display:'flex',alignItems:'center',gap:5,color:'#111',fontWeight:600}}>
                 <span style={{width:18,height:3,background:s.color,display:'inline-block',borderRadius:2}}></span>{s.label}
               </span>)}
             </div>
-            <LineChart categories={allAges.map(a=>`Day ${a}`)} unit="KSC" decimals={1} showValues series={c2Series.filter(s=>s.data.some(v=>v!=null))} height={280}/>
+            <LineChart categories={allAges.map(a=>`Day ${a}`)} unit="KSC" decimals={1} showValues boxedLabels series={c2Series.filter(s=>s.data.some(v=>v!=null))} height={280}/>
           </>
         }
       </div>
