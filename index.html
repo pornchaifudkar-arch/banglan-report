@@ -541,7 +541,7 @@ function LineChart({categories,series,targets=[],height=300,unit='',decimals=0,y
   let boxEls=null;
   if(showValues&&boxedLabels&&W>0){
     const lbls=[];
-    series.forEach((s)=>{s.data.forEach((v,i)=>{if(v==null||s.dashed)return;const danger=dangerBelow!=null&&v<dangerBelow;const pass=dangerBelow!=null&&v>=dangerBelow;lbls.push({xi:i,cx:x(i),cy:y(v)-16,color:s.color,text:fmt(v,decimals),danger,pass});});});
+    series.forEach((s)=>{s.data.forEach((v,i)=>{if(v==null||(s.dashed&&!s.showLabel))return;const danger=dangerBelow!=null&&v<dangerBelow;const pass=dangerBelow!=null&&v>=dangerBelow;lbls.push({xi:i,cx:x(i),cy:y(v)-16,color:s.color,text:fmt(v,decimals),danger,pass});});});
     const byXi={};
     lbls.forEach((l,idx)=>{if(!byXi[l.xi])byXi[l.xi]=[];byXi[l.xi].push({...l,idx});});
     const GAP=21;
@@ -1997,16 +1997,10 @@ window.__dataReady.then(data => {
       if(knownPts.length<2||missingAges.length===0) return null;
       const predict=powerFit(knownPts);
       if(!predict) return null;
-      return {label:`${s.label} (แนวโน้ม)`,color:s.color,dashed:true,
+      return {label:`${s.label} (แนวโน้ม)`,color:s.color,dashed:true,showLabel:true,
         data:curveAges.map((a,i)=>s.data[i]!=null?null:predict(a))};
     }).filter(Boolean):[];
-    const c2AvgData=selSample?curveAges.map(a=>{
-      const vals=c2DataSeries.map(s=>s.data[curveAges.indexOf(a)]).filter(v=>v!=null);
-      return vals.length?Math.round(vals.reduce((a,b)=>a+b,0)/vals.length*10)/10:null;
-    }):[];
-    const c2AvgSeries=(selSample&&c2DataSeries.length>1&&c2AvgData.some(v=>v!=null))
-      ?[{label:'ค่าเฉลี่ย',color:'#e67e22',dashed:true,data:c2AvgData}]:[];
-    const c2Series=[...c2DataSeries,...c2TrendSeries,...c2AvgSeries];
+    const c2Series=[...c2DataSeries,...c2TrendSeries];
 
     const btnStyle={padding:'4px 10px',borderRadius:5,border:'1px solid #ccd',background:'#f5f6fa',cursor:'pointer',fontSize:13,color:'#444'};
 
