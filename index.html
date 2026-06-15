@@ -595,7 +595,7 @@ function LineChart({categories,series,targets=[],height=300,unit='',decimals=0,y
       {series.map((s,si)=><g key={si}>
         <path d={lp(s.data)} fill="none" stroke={s.color} strokeWidth={s.dashed?1.8:2.4} strokeDasharray={s.dashed?"6 4":undefined} strokeLinejoin="round" strokeLinecap="round"/>
         {showValues&&!boxedLabels&&!s.dashed&&s.data.map((v,i)=>v==null?null:<text key={'vl'+i} x={x(i)} y={y(v)-11} textAnchor="middle" className="bar-val" fill={dangerBelow!=null&&v<dangerBelow?PALETTE.cancel:s.color}>{fmt(v,decimals)}</text>)}
-        {s.data.map((v,i)=>v==null?null:<circle key={i} cx={x(i)} cy={y(v)} r={s.dashed?3.5:(hover===i?5:(dangerBelow!=null&&v<dangerBelow?4:3))} fill={s.dashed?s.color:"#fff"} stroke={dangerBelow!=null&&v<dangerBelow?PALETTE.cancel:s.color} strokeWidth="2"/>)}
+        {s.data.map((v,i)=>{if(v==null)return null;const r=s.dashed?3.5:(hover===i?5:(dangerBelow!=null&&v<dangerBelow?4:3.5));const sc=dangerBelow!=null&&v<dangerBelow?PALETTE.cancel:s.color;const sf=s.dashed?s.color:'#fff';const sh=s.shape||'circle';const cx2=x(i),cy2=y(v);if(sh==='square')return <rect key={i} x={cx2-r} y={cy2-r} width={r*2} height={r*2} fill={sf} stroke={sc} strokeWidth="2"/>;if(sh==='triangle'){const pts=`${cx2},${cy2-r} ${cx2-r*0.9},${cy2+r*0.7} ${cx2+r*0.9},${cy2+r*0.7}`;return <polygon key={i} points={pts} fill={sf} stroke={sc} strokeWidth="2"/>;}if(sh==='diamond'){const pts=`${cx2},${cy2-r*1.2} ${cx2+r*0.9},${cy2} ${cx2},${cy2+r*1.2} ${cx2-r*0.9},${cy2}`;return <polygon key={i} points={pts} fill={sf} stroke={sc} strokeWidth="2"/>;}if(sh==='star'){const pts=[0,1,2,3,4].map(k=>{const a=k*Math.PI*2/5-Math.PI/2;const ro=k%2===0?r*1.2:r*0.5;return `${cx2+ro*Math.cos(a)},${cy2+ro*Math.sin(a)}`;}).join(' ');return <polygon key={i} points={pts} fill={sc} stroke={sc} strokeWidth="1"/>;}return <circle key={i} cx={cx2} cy={cy2} r={r} fill={sf} stroke={sc} strokeWidth="2"/>;})}
       </g>)}
       {boxEls}
       {hover!=null&&<line x1={x(hover)} x2={x(hover)} y1={pad.t} y2={pad.t+iH} stroke={PALETTE.axis} strokeDasharray="3 3" opacity="0.5"/>}
@@ -1860,6 +1860,7 @@ window.__dataReady.then(data => {
     const [selFormulas2,setSelFormulas2]=useState([]);
 
     const COLORS=['#2f5fd0','#d65b5b','#d98a2b','#15a39b','#7b61c4','#5a8f3c','#c44d8f','#4a6b8a','#b07b3a','#8a8f9a'];
+    const SHAPES=['circle','square','triangle','diamond','star','circle','square','triangle','diamond','star'];
 
     useEffect(()=>{
       fetch(CONCRETE_URL).then(r=>r.json()).then(res=>{
@@ -1922,7 +1923,7 @@ window.__dataReady.then(data => {
         const ci=(fi*activeAges.length+ai)%COLORS.length;
         const label=activeAges.length>1?`${f} Day${a}`:f;
         c1Series.push({
-          label, color:COLORS[ci],
+          label, color:COLORS[ci], shape:SHAPES[ci],
           data:c1Dates.map(d=>{
             const rs=filt.filter(r=>sd(r)===d&&fm(r)===f&&ag(r)===a);
             if(!rs.length) return null;
@@ -1938,7 +1939,7 @@ window.__dataReady.then(data => {
     );
     const c2Forms=selFormulas2.length?selFormulas2:allFormulas;
     const c2DataSeries=selSample?c2Forms.map((f,fi)=>({
-      label:f, color:COLORS[fi%COLORS.length],
+      label:f, color:COLORS[fi%COLORS.length], shape:SHAPES[fi%SHAPES.length],
       data:CURVE_AGES.map(a=>{
         const rs=rows.filter(r=>sd(r)===selSample&&fm(r)===f&&ag(r)===a);
         if(!rs.length) return null;
@@ -2003,7 +2004,14 @@ window.__dataReady.then(data => {
           :<>
             <div style={{display:'flex',gap:16,flexWrap:'wrap',marginBottom:8}}>
               {c1Series.filter(s=>s.data.some(v=>v!=null)).map(s=><span key={s.label} style={{fontSize:12,display:'flex',alignItems:'center',gap:5,color:'#111',fontWeight:600}}>
-                <span style={{width:18,height:3,background:s.color,display:'inline-block',borderRadius:2}}></span>{s.label}
+                <svg width="14" height="14" style={{flexShrink:0}}>
+                  {s.shape==='square'&&<rect x="1" y="1" width="12" height="12" fill="#fff" stroke={s.color} strokeWidth="2"/>}
+                  {s.shape==='triangle'&&<polygon points="7,1 13,13 1,13" fill="#fff" stroke={s.color} strokeWidth="2"/>}
+                  {s.shape==='diamond'&&<polygon points="7,1 13,7 7,13 1,7" fill="#fff" stroke={s.color} strokeWidth="2"/>}
+                  {s.shape==='star'&&<polygon points="7,1 8.5,5.5 13,5.5 9.5,8.5 11,13 7,10 3,13 4.5,8.5 1,5.5 5.5,5.5" fill={s.color} stroke={s.color} strokeWidth="1"/>}
+                  {(!s.shape||s.shape==='circle')&&<circle cx="7" cy="7" r="5" fill="#fff" stroke={s.color} strokeWidth="2"/>}
+                </svg>
+                {s.label}
               </span>)}
             </div>
             <LineChart categories={c1Dates.map(shortDate)} unit="KSC" decimals={1} showValues boxedLabels series={c1Series.filter(s=>s.data.some(v=>v!=null))} targets={c1Targets} dangerBelow={c1Danger} height={320}/>
