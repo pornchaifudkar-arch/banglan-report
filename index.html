@@ -539,7 +539,7 @@ function LineChart({categories,series,targets=[],height=300,unit='',decimals=0,y
   let boxEls=null;
   if(showValues&&boxedLabels&&W>0){
     const lbls=[];
-    series.forEach((s)=>{s.data.forEach((v,i)=>{if(v==null||s.dashed)return;const danger=dangerBelow!=null&&v<dangerBelow;lbls.push({xi:i,cx:x(i),cy:y(v)-16,color:danger?PALETTE.cancel:s.color,text:fmt(v,decimals),danger});});});
+    series.forEach((s)=>{s.data.forEach((v,i)=>{if(v==null||s.dashed)return;const danger=dangerBelow!=null&&v<dangerBelow;const pass=dangerBelow!=null&&v>=dangerBelow;const lcolor=danger?PALETTE.cancel:pass?'#4f8a32':s.color;lbls.push({xi:i,cx:x(i),cy:y(v)-16,color:lcolor,text:fmt(v,decimals),danger,pass});});});
     const byXi={};
     lbls.forEach((l,idx)=>{if(!byXi[l.xi])byXi[l.xi]=[];byXi[l.xi].push({...l,idx});});
     const GAP=21;
@@ -563,8 +563,8 @@ function LineChart({categories,series,targets=[],height=300,unit='',decimals=0,y
       const rx=Math.max(pad.l, Math.min(l.cx-tw/2, W-pad.r-tw));
       const tx=rx+tw/2;
       return <g key={'bl'+idx}>
-        <rect x={rx} y={l.cy-14} width={tw} height={17} rx="3" fill={l.danger?'#fff3f3':'white'} stroke={l.color} strokeWidth="1.8"/>
-        <text x={tx} y={l.cy} textAnchor="middle" fill={l.danger?PALETTE.cancel:'#111'} style={{fontSize:'10px',fontWeight:700,fontFamily:'var(--num)'}}>{l.text}</text>
+        <rect x={rx} y={l.cy-14} width={tw} height={17} rx="3" fill={l.danger?'#fff3f3':l.pass?'#f0fae8':'white'} stroke={l.color} strokeWidth="1.8"/>
+        <text x={tx} y={l.cy} textAnchor="middle" fill={l.danger?PALETTE.cancel:l.pass?'#4f8a32':'#111'} style={{fontSize:'10px',fontWeight:700,fontFamily:'var(--num)'}}>{l.text}</text>
       </g>;
     });
   }
