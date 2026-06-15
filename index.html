@@ -2129,7 +2129,7 @@ window.__dataReady.then(data => {
           <LineChart
             categories={dLabels}
             series={[{label:'Strength',color:'#2f5fd0',data:dVals}]}
-            targets={[{value:450,label:'',color:'#e74c3c'},...(dAvg!=null?[{value:dAvg,label:'',color:'#5a8f3c'}]:[])]}
+            targets={[{value:450,label:'ขั้นต่ำ',color:'#e74c3c'},...(dAvg!=null?[{value:dAvg,label:'',color:'#5a8f3c'}]:[])]}
 
             dangerBelow={450}
             showValues
