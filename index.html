@@ -2083,7 +2083,7 @@ window.__dataReady.then(data => {
                 {s.label}
               </span>)}
             </div>
-            <LineChart categories={c1Dates.map(shortDate)} unit="KSC" decimals={1} showValues boxedLabels series={c1Series.filter(s=>s.data.some(v=>v!=null))} targets={c1Targets} dangerBelow={c1Danger} height={320}/>
+            <LineChart categories={c1Dates.map(shortDate)} unit="KSC" decimals={0} showValues boxedLabels series={c1Series.filter(s=>s.data.some(v=>v!=null))} targets={c1Targets} dangerBelow={c1Danger} height={320}/>
           </>
         }
       </div>
@@ -2111,7 +2111,7 @@ window.__dataReady.then(data => {
                 {s.label}
               </span>)}
             </div>
-            <LineChart categories={CURVE_AGES.map(a=>`Day ${a}`)} unit="KSC" decimals={1} showValues boxedLabels series={c2Series.filter(s=>s.data.some(v=>v!=null))} height={280}/>
+            <LineChart categories={CURVE_AGES.map(a=>`Day ${a}`)} unit="KSC" decimals={0} showValues boxedLabels series={c2Series.filter(s=>s.data.some(v=>v!=null))} height={280}/>
           </>
         }
       </div>
